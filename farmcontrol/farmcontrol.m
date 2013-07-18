@@ -8,15 +8,15 @@ Tend=400; % time end
 % farm properties
 parm.N=4; % number of turbines in farm
 farmcontrol=1; % enable wind farm control
-P_demand=10e6; % some number
+P_demand=2*5e6; % some number
 
 %turbine properties
 parm.rho=1.227; %air density
 parm.radius=63*ones(1,4); % rotor radius (NREL5MW)
 parm.rated=5e6*ones(1,4); %rated power (NREL5MW)
-parm.ratedSpeed=1.26;
+parm.ratedSpeed=1.267;
 %parm.Cp=0.45*ones(1,4); %max cp (NREL5MW)
-parm.Cp = max(max(wt.cp.table))*ones(1,4);
+parm.Cp = ones(1,4)*max(max(wt.cp.table));
 
 
 %Pitch control
@@ -27,39 +27,38 @@ PC_MaxPit=90;
 PC_MinPit=0;
 
 %region control NREL
-VS_Rgn2Sp     =      91.21091;
 VS_CtInSp     =      70.16224;
 VS_RtGnSp     =     121.6805;
-VS_Rgn2K      =       2.332287;  
+VS_Rgn2K      =       2.332287; 
 % load dummy wind
 wind=load('wind.mat');
 
 % turbine initial conditions
-omega0=1.26;
+omega0=1.267;
 beta0=0;
 power0=5e6;
 x=[omega0*ones(parm.N,1) wind.wind(1,2)*ones(parm.N,1)];
 Ct=ones(1,4);
 u=[beta0*ones(parm.N,1) power0*ones(parm.N,1)];
 P_ref=zeros(parm.N,((Tend-Tstart)/DT));
-
+Power=P_ref;
 for i=2:((Tend-Tstart)/DT) %At each sample time(DT) from Tstart to Tend
     
     v_nac(:,i)=wake(Ct(i-1,:),i);
     x(:,2) = v_nac(:,i);
     %Farm control
     if farmcontrol==1
-        [P_ref(:,i) Pa(:,i)]  = Farm_Controller(v_nac(:,i),P_demand,parm);
+        [P_ref(:,i) Pa(:,i)]  = Farm_Controller(v_nac(:,i),P_demand,Power(:,i-1),parm);
     end
     
     %Turbine control
     for j=1:parm.N
-        if ( (   x(j,1) >= parm.ratedSpeed ) || (  u(j,1) >= 1 ) )   % We are in region 3 - power is constant
+        if ( (   x(j,1)*97 >= VS_RtGnSp ) || (  u(j,1) >= 1 ) )   % We are in region 3 - power is constant
             u(j,2) = P_ref(j,i)./x(j,1);
         elseif ( x(j,1)*97 <= VS_CtInSp )                            %! We are in region 1 - torque is zero
             u(j,2) = 0.0;
         else                                                         %! We are in region 2 - optimal torque is proportional to the square of the generator speed
-            u(j,2) = VS_Rgn2K*x(j,1)*x(j,1)*97^2*(60/2/pi)^2;
+            u(j,2) =97*VS_Rgn2K*x(j,1)*x(j,1)*97^2;
         end
     end
     
@@ -82,9 +81,9 @@ for i=2:((Tend-Tstart)/DT) %At each sample time(DT) from Tstart to Tend
         [x(j,1), Ct(i,j), Cp(i,j)]=Turbine_Drivetrain(x(j,:),u(j,:),wt,env);
     end
     Omega(:,i)=x(:,1);
-    
+    Power(:,i)=Omega(:,i).*Mg(:,i);
 end
-out=[DT*[0:((Tend-Tstart)/DT)-1]' v_nac' Omega' beta' P_ref' Ct Cp Pa' Mg'];
+out=[DT*[0:((Tend-Tstart)/DT)-1]' v_nac' Omega' beta' P_ref' Ct Cp Pa' Mg' Power'];
 save offwind.mat out
 figure(1)
 plot(out(:,1),out(:,6:9)) % rotor speed
@@ -93,8 +92,10 @@ figure(2)
 plot(out(:,1),out(:,10:13)) % Blade pitch angle
 title('Blade pitch angle')
 figure(3)
-plot(out(:,1),out(:,14:17)) % Power reference
-title('Power reference')
+plot(out(:,1),out(:,14:17)/1e6) % Power reference
+title('Individual turbine power reference')
+xlabel('time')
+ylabel('Power reference [MW]')
 figure(4)
 plot(out(:,1),out(:,30:33)) % generator torque reference
 title('Generator torque reference')
@@ -104,18 +105,27 @@ figure(5)
 plot(out(:,1),out(:,2:5)) % Wind speed
 title('Wind speed')
 save slet_wrkspc
-plot(out(:,1),sum(out(:,14:17),2),out(:,1),sum(out(:,26:29),2),out(:,1),sum(Mg.*Omega)'); %Ttotal power demand
+plot(out(:,1),sum(out(:,14:17),2)/1e6,out(:,1),sum(out(:,26:29),2)/1e6,out(:,1),sum(Power)'/1e6); %Ttotal power demand
+title('Total farm power')
+legend('Power Demand','Available Power','Actual Production')
+xlabel('time')
+ylabel('Power [MW]')
+figure(6)
+plot(out(:,1),sum(P_ref',2),out(:,1),sum(Pa',2),out(:,1),sum(Mg.*Omega)'); %Ttotal power demand
 title('Total power')
 legend('Demand','Available','Actual')
+figure(7)
+plot(out(:,1),(Mg.*Omega)'); %Total power produced
+title('Total power produced')
 
 
 
 function v_nac=wake(Ct,i)
 % run wake simulation as function of Ct of each turbine
 global wind
-v_nac=[.8 .7 .6 .5]*wind.wind(i,2);
+v_nac=[.9 .8 .7 .6]*wind.wind(i,2);
 
-function [P_ref, P_a]  = Farm_Controller(v_nac,P_demand,parm)
+function [P_ref, P_a]  = Farm_Controller(v_nac,P_demand,Power,parm)
 
 %P_ref is a vector of power refenreces for tehe wind turbine with dimension 1xN
 %v_nac is a vector of wind speed at each wind turbine with dimension 1xN
@@ -142,12 +152,14 @@ P_avail=sum(P_a);
 
 %Distribute power according to availibility
 for i=1:N
-    if P_demand<P_avail
+%    if P_demand<P_avail
         P_ref(i)=max(0,min(rated(i),P_demand*P_a(i)/P_avail));
-    else
-        P_ref(i)=P_a(i);
-    end
+%    else
+%        P_ref(i)=P_a(i);
+%    end
 end
+
+
 
 function [Omega, Ct, Cp] =Turbine_Drivetrain(x,u,wt,env)
 % Parameters
