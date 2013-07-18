@@ -55,11 +55,7 @@ PROGRAM WAKE
 
      CALL COMPUTE_WPower
      CALL WRITE_DATA_power
-PRINT *,' POWER'
-DO i=1,N_TURB
 
-    print*, order(i), WPOWER(i),  WPOWER(i)/ WPOWER(1)
-ENDDO
 
  END !PROGRAM WAKE 
 !*****************************************************
@@ -95,7 +91,7 @@ END !
   IMPLICIT NONE
   INTEGER :: i,j
 
-         OPEN(unit=30, file='initial_data.out', status='unknown')
+         OPEN(unit=30, file='initial_data.inp', status='unknown')
 
          READ(30,*) IMAX  ! The number of grid points in x direction
          READ(30,*) JMAX  ! The number of the grid points in Y direction
@@ -264,7 +260,7 @@ SUBROUTINE WRITE_DATA
       write(110,*),'0.1   ','  10  ','  10000  ','  0.1 '
       DO j=1,JMAX
          DO i=1,IMAX
-            WRITE(110, *)1
+            WRITE(110, *)rho
          ENDDO
       ENDDO
       DO j=1,JMAX
@@ -472,17 +468,16 @@ SUBROUTINE WRITE_DATA_power
       INTEGER i 
       character*80 file1
       file1='power_data.1'
-      print*, 'file1'
-      OPEN(unit=20, file='Power_data.2', status='unknown')
-      OPEN(unit=21, file='Power_data.3', status='unknown')     
+      OPEN(unit=20, file='Power_Output.dat', status='unknown')
+            WRITE(20, *)'Turbine Number(m)', 'Turbine Order', 'Turbine Location-X(m)', 'Turbine Location-Y(m)    ', 'POWER(W)'
+!            WRITE(20, *)'   Turbine Number(m)   ', 'Turbine Order (according to Y-coordinate)', 'Turbine Location-X(m)   ', 'Turbine Location-Y(m)    ', 'POWER(W)', '  Relative Power'
       DO i=1,N_TURB
-            WRITE(20, *) x_turb(i),y_turb(i), WPOWER(i)
-             WRITE(21, *) order(i), x_turb(i),y_turb(i), WPOWER(i), WPOWER(i)/WPOWER(1)
+             WRITE(20, *) i, order(i), x_turb(i),y_turb(i), WPOWER(i), WPOWER(i)/WPOWER(1)
       ENDDO
 
  
 
-      CLOSE(10)
+      CLOSE(20)
       END
 !************************************************************************	
           
