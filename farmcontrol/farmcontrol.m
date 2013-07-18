@@ -1,4 +1,4 @@
-function farmcontrolv3
+function farmcontrol
 global wind DT
 load NREL5mw.mat
 DT=0.0125; % time step
@@ -29,7 +29,7 @@ PC_MinPit=0;
 %region control NREL
 VS_CtInSp     =      70.16224;
 VS_RtGnSp     =     121.6805;
-VS_Rgn2K      =       2.332287; 
+VS_Rgn2K      =       2.332287;
 % load dummy wind
 wind=load('wind.mat');
 
@@ -40,16 +40,30 @@ power0=5e6;
 x=[omega0*ones(parm.N,1) wind.wind(1,2)*ones(parm.N,1)];
 Ct=ones(1,4);
 u=[beta0*ones(parm.N,1) power0*ones(parm.N,1)];
+Mg_old =u(:,2);
 P_ref=zeros(parm.N,((Tend-Tstart)/DT));
 Power=P_ref;
+P_ref_sample_time = 5;
 for i=2:((Tend-Tstart)/DT) %At each sample time(DT) from Tstart to Tend
     
     v_nac(:,i)=wake(Ct(i-1,:),i);
     x(:,2) = v_nac(:,i);
     %Farm control
     if farmcontrol==1
-        [P_ref(:,i) Pa(:,i)]  = Farm_Controller(v_nac(:,i),P_demand,Power(:,i-1),parm);
+        [P_ref_new Pa(:,i)]  = Farm_Controller(v_nac(:,i),P_demand,Power(:,i-1),parm);
     end
+    
+    %Hold  the demand for some seconds
+    if(  mod(i,round(P_ref_sample_time/DT))==2)
+        P_ref(:,i) = P_ref_new;
+    else
+        % end
+        alpha = 0.01;
+        P_ref(:,i) = (1-alpha)*P_ref(:,i-1)+ (alpha)*P_ref_new;;
+        
+    end
+    
+    
     
     %Turbine control
     for j=1:parm.N
@@ -63,12 +77,23 @@ for i=2:((Tend-Tstart)/DT) %At each sample time(DT) from Tstart to Tend
     end
     
     
+    %Rate limit torque change
+    u(:,2) - Mg_old;
+    
+    Mg_max_rate = 1e6*DT;
+    
+    u(:,2) =   sign(u(:,2) - Mg_old) .* min(abs(u(:,2) - Mg_old), Mg_max_rate) + Mg_old;
+    
     Mg(:,i)=u(:,2);
+    Mg_old = Mg(:,i);
+    
+    
+    
     
     e=97*(omega0*ones(parm.N,1)-x(:,1));
     ee =ee-DT*e;
-    ee=min( max( ee, PC_MinPit/Ki), PC_MaxPit/Ki); 
-                                       
+    ee=min( max( ee, PC_MinPit/Ki), PC_MaxPit/Ki);
+    
     u(:,1)=-Kp*DT*e+Ki*ee;
     for j=1:parm.N
         u(j,1)=min( max( u(j,1), PC_MinPit), PC_MaxPit);
@@ -152,11 +177,11 @@ P_avail=sum(P_a);
 
 %Distribute power according to availibility
 for i=1:N
-%    if P_demand<P_avail
-        P_ref(i)=max(0,min(rated(i),P_demand*P_a(i)/P_avail));
-%    else
-%        P_ref(i)=P_a(i);
-%    end
+    %    if P_demand<P_avail
+    P_ref(i)=max(0,min(rated(i),P_demand*P_a(i)/P_avail));
+    %    else
+    %        P_ref(i)=P_a(i);
+    %    end
 end
 
 
