@@ -3,8 +3,8 @@ MODULE GeneralData
         INTEGER (kind=4)::N_TURB, IMAX, JMAX
 	real (kind=8):: dx,dy, pi, xmax, ymax, ymin, xmin,ang
       
+      real (kind=8), ALLOCATABLE :: x(:),y(:), vell_i(:,:),order(:)
 
-      real (kind=8), ALLOCATABLE :: x(:),y(:), vell_i(:,:)
       real (kind=8), ALLOCATABLE :: x_turb(:), y_turb(:), R_TURB (:), WPOWER(:) ! location of the turbine
       integer(kind=4), ALLOCATABLE :: xc_turb(:), yc_turb(:)
 END MODULE GeneralData
@@ -103,7 +103,7 @@ END !
          READ(30,*)Uhub   !m/s - VELOCITY AT THE HUB, WITHOUT THE INFLUENCE OF THE WIND TURBIN
          READ(30,*)N_TURB !THE NUMBER OF THE TURBINE
          ALLOCATE (x_turb(N_TURB), y_turb(N_TURB), R_TURB(N_TURB),WPOWER(N_TURB)) 
-         ALLOCATE (xc_turb(N_TURB), yc_turb(N_TURB))
+         ALLOCATE (xc_turb(N_TURB), yc_turb(N_TURB), order(N_TURB))
          READ(30,*) rho  ! THE DENSITY OF THE AIR 
          READ(30,*) dist  ! the distance behind the turbine where the power is computed
          READ(30,*) ang   ! rotational angle of the axis: vellocity has the same direction as Ox
@@ -187,11 +187,18 @@ END ! subroutine deternines the center coordinates of the turbines
   IMPLICIT NONE
   INTEGER i,j, k
   REAL (kind=8)::aa,bb
+  DO i =1,N_TURB
+     order(i)=i
+  ENDDO
+! Sort turbines according to x-coordinate. Keep track of original number in the "order" variable
   DO i=1, N_TURB-1
      DO j=1, N_TURB-i
         If(x_turb(j) > x_turb(j+1)) THEN
             aa= x_turb(j)
             bb= y_turb(j)
+            k=order(j)
+            order(j)=order(j+1)
+            order(j+1)=k
             x_turb(j) = x_turb(j+1)
             y_turb(j) = y_turb(j+1)
             x_turb(j+1) = aa
@@ -200,6 +207,7 @@ END ! subroutine deternines the center coordinates of the turbines
      ENDDO
    ENDDO
 
+! If multiple turbines have same x-coordinates, sort by y-coordinate
 !DO j=1,N_turb
   DO i=1, N_TURB
      DO k=i+1, N_TURB
@@ -207,6 +215,9 @@ END ! subroutine deternines the center coordinates of the turbines
            IF (y_turb(i) > y_turb(k))  THEN
               aa= y_turb(i)
               y_turb(i) = y_turb(k)
+              j=order(k)
+              order(k)=order(i)
+              order(i)=j
               y_turb(k) = aa
            endif
         ENDIF
@@ -255,7 +266,7 @@ SUBROUTINE WRITE_DATA
       ENDDO
       DO j=1,JMAX
          DO i=1,IMAX
-            WRITE(110, *)rho*vell_i(i,j)
+            WRITE(110, *)vell_i(i,j)
          ENDDO
       ENDDO
       DO j=1,JMAX
@@ -459,9 +470,9 @@ SUBROUTINE WRITE_DATA_power
       character*80 file1
       file1='power_data.1'
       OPEN(unit=20, file='Power_Output.dat', status='unknown')
-            WRITE(20, *)'   Turbine Number(m)   ', 'Turbine Location-X(m)   ', 'Turbine Location-Y(m)    ', 'POWER(W)'
+            WRITE(20, *)'Turbine Number(m)', 'Original Number', 'Turbine Location-X(m)', 'Turbine Location-Y(m)    ', 'POWER(W)'
       DO i=1,N_TURB
-            WRITE(20, *)i, x_turb(i),y_turb(i), WPOWER(i)
+            WRITE(20, *) i, order(i), x_turb(i),y_turb(i), WPOWER(i), WPOWER(i)/WPOWER(1)
       ENDDO
 
       CLOSE(20)
