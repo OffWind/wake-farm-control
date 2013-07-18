@@ -288,7 +288,7 @@ SUBROUTINE WRITE_DATA
 
 
 ! Write simple file with coordinates and wind speed
-      OPEN(unit=12, file='simple_flow.out', status='unknown') 
+      OPEN(unit=12, file='simple_flow.dat', status='unknown') 
       DO j=1,JMAX
          DO i=1,IMAX
             WRITE(12, *) x(i),y(j),vell_i(i,j)
