@@ -42,7 +42,7 @@ PROGRAM WAKE
         Ct = 0.3
      ENDIF
      Cp=0.5*(1+sqrt(1-Ct))*Ct
-     CALL ORDER 
+     CALL WT_ORDER 
      ppp=5.
      CALL DOMAIN_PT(x,IMAX, dx, Dturb, x_turb,N_TURB, xmax,xmin,ppp)
      ppp=2.
@@ -181,7 +181,7 @@ END ! subroutine deternines the center coordinates of the turbines
 !*****************************************************************
 ! ORDER of THE TURBINE in function of x coordinate
 !_******************************************************************??? 
- SUBROUTINE ORDER
+ SUBROUTINE WT_ORDER
   USE GeneralDatA
   USE SolverData
   IMPLICIT NONE
