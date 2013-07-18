@@ -57,6 +57,12 @@ PROGRAM WAKE
      CALL WRITE_DATA_power
 
 
+! Deallocate the memory form the arrays again - necessary to avoid segfault i matlab
+         DEALLOCATE (x,y,vell_i)
+         DEALLOCATE (x_turb, y_turb, R_TURB,WPOWER) 
+         DEALLOCATE (xc_turb, yc_turb, order)
+
+
  END !PROGRAM WAKE 
 !*****************************************************
 
@@ -280,8 +286,20 @@ SUBROUTINE WRITE_DATA
          ENDDO
       ENDDO
 
+
+! Write simple file with coordinates and wind speed
+      OPEN(unit=12, file='simple_flow.out', status='unknown') 
+      DO j=1,JMAX
+         DO i=1,IMAX
+            WRITE(12, *) x(i),y(j),vell_i(i,j)
+         ENDDO
+         WRITE(12, *)
+      ENDDO
+
+
       CLOSE(10)
       CLOSE(110)
+      CLOSE(12)
 
       END
 !************************************************************************
