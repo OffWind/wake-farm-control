@@ -25,9 +25,9 @@ P_avail=sum(P_a);
 
 %Distribute power according to availibility
 for i=1:N
-    %    if P_demand<P_avail
+        if P_demand<P_avail
     P_ref(i)=max(0,min(rated(i),P_demand*P_a(i)/P_avail));
-    %    else
-    %        P_ref(i)=P_a(i);
-    %    end
+        else
+            P_ref(i)=P_a(i);
+        end
 end
