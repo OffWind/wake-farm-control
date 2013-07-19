@@ -19,7 +19,7 @@ enableTurbineDynamics = true; %Enable dynamical turbine model. Disabling this wi
 
 %Add path to wake code
 if(~exist('plot_wind_field'))
-addpath([pwd '/../wake']);
+    addpath([pwd '/../wake']);
 end
 
 %Time parameters (in seconds)
@@ -89,9 +89,9 @@ for i=2:((Tend-Tstart)/DT) %At each sample time(DT) from Tstart to Tend
     %Calculate the wake using the current Ct values
     v_nac(:,i)=wakeCalculation(Ct(i-1,:),i,wind);
     x(:,2) = v_nac(:,i);
-
     
-    %Farm control 
+    
+    %Farm control
     %Calculate the power distribution references for each turbine
     if enablePowerDistribution==1
         [P_ref_new Pa(:,i)]  = powerDistributionControl(v_nac(:,i),P_demand,Power(:,i-1),parm);
@@ -101,13 +101,13 @@ for i=2:((Tend-Tstart)/DT) %At each sample time(DT) from Tstart to Tend
     if(  mod(i,round(P_ref_sample_time/DT))==2)
         P_ref(:,i) = P_ref_new;
     else
-
+        
         powerRefInterpolation = true;
         if(powerRefInterpolation)
-        alpha = 0.01;
-        P_ref(:,i) = (1-alpha)*P_ref(:,i-1)+ (alpha)*P_ref_new;;
+            alpha = 0.01;
+            P_ref(:,i) = (1-alpha)*P_ref(:,i-1)+ (alpha)*P_ref_new;;
         else
-        P_ref(:,i) = P_ref_new;       
+            P_ref(:,i) = P_ref_new;
         end
     end
     
@@ -115,7 +115,7 @@ for i=2:((Tend-Tstart)/DT) %At each sample time(DT) from Tstart to Tend
     
     %Calculate control for each individual turbine - should be moved to the
     %turbine (drivetrain) model.
-
+    
     
     %Torque controller
     for j=1:parm.N
@@ -130,7 +130,7 @@ for i=2:((Tend-Tstart)/DT) %At each sample time(DT) from Tstart to Tend
     
     
     %Rate limit torque change
-  %  u(:,2) - Mg_old;
+    %  u(:,2) - Mg_old;
     Mg_max_rate = 1e6*DT;
     u(:,2) =   sign(u(:,2) - Mg_old) .* min(abs(u(:,2) - Mg_old), Mg_max_rate) + Mg_old;
     
@@ -146,31 +146,31 @@ for i=2:((Tend-Tstart)/DT) %At each sample time(DT) from Tstart to Tend
         u(j,1)=min( max( u(j,1), PC_MinPit), PC_MaxPit);
     end
     
-if(~enableTurbineDynamics)
-    u = u0;
-end
-
+    if(~enableTurbineDynamics)
+        u = u0;
+    end
+    
     Mg(:,i)=u(:,2);
     Mg_old = Mg(:,i);
     beta(:,i)=u(:,1); %Set pitch
-
+    
     
     %Turbine dynamics - can be simplified
-if(enableTurbineDynamics)
-    
-    for j=1:parm.N
-        [x(j,1), Ct(i,j), Cp(i,j)]=turbineDrivetrainModel(x(j,:),u(j,:),wt,env,DT);
+    if(enableTurbineDynamics)
+        
+        for j=1:parm.N
+            [x(j,1), Ct(i,j), Cp(i,j)]=turbineDrivetrainModel(x(j,:),u(j,:),wt,env,DT);
+        end
+    else
+        Ct(i,:) = parm.Ct;
+        Cp(i,:) = parm.Cp;
+        x(:,1) = parm.ratedSpeed;%Rotational speed
     end
-else
-    Ct(i,:) = parm.Ct;
-    Cp(i,:) = parm.Cp;
-x(:,1) = parm.ratedSpeed;%Rotational speed
-end
     
     Omega(:,i)=x(:,1);
     Power(:,i)=Omega(:,i).*Mg(:,i);
-
-
+    
+    
 end
 
 
