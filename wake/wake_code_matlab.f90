@@ -13,7 +13,7 @@ MODULE SolverData
        USE GeneralData
        IMPLICIT NONE
       REAL (kind=8) :: Ct,Dturb,Kwake,H,Uhub, Dwake
-      REAL (kind=8) :: rho, Cp, dist
+      REAL (kind=8) :: rho, Cp, dist, ratedPower
   
       REAL, DIMENSION(1000,1000)::V,Darea,Darea_D
 END MODULE SolverData 
@@ -28,7 +28,6 @@ SUBROUTINE WAKE
       INTEGER(kind=4):: i,j,k
       REAL (kind=8) ::ppp
       REAL (kind=4)::  W_coef
-      character*80 file1
 !*************************************************
       pi=3.1415926535897
 !************************************************************************
@@ -104,6 +103,7 @@ END !
          ALLOCATE (x(IMAX),y(JMAX),vell_i(IMAX,JMAX))
          READ(30 ,*)Dturb ! THE DIAMETER OF THE TURBIN
          READ(30,*)H      !  THE HEIGHT OF THE TURBINE
+         READ(30,*)ratedPower      !  The maximum power production for the single turbine
          READ(30 ,*) Ct   ! TURBINE THRUST COEFFICIENT
          READ(30,*)Kwake  ! wake expand scalar
          READ(30,*)Uhub   !m/s - VELOCITY AT THE HUB, WITHOUT THE INFLUENCE OF THE WIND TURBIN
@@ -243,9 +243,6 @@ SUBROUTINE WRITE_DATA
       USE SolverData
       IMPLICIT NONE
       INTEGER i ,j
-!	character*80 file1
-
-!	file1='datab.1'
 
       OPEN(unit=10, file='FLOW.xyz', status='unknown') 
       OPEN(unit=110, file='FLOW.q', status='unknown') 
@@ -467,7 +464,8 @@ SUBROUTINE COMPUTE_WPower
       ENDIF
            vv2=(vv2 + vv1*(SS0-SS))/SS0
    
-           WPOWER(k)=0.5*rho*( vv2**3)*SS0*Cp
+           !Calculate the average power as the minimum of the possible power given the wind speed and the actual maximum power possible to produce by the turbine
+           WPOWER(k)=min(0.5*rho*( vv2**3)*SS0*Cp, ratedPower)
 
 ENDDO 
 END   ! subroutine that compute the velocity in front of the wind turbine
@@ -485,8 +483,26 @@ SUBROUTINE WRITE_DATA_power
       USE SolverData
       IMPLICIT NONE
       INTEGER i 
-      character*80 file1
-      file1='power_data.1'
+      REAL (kind=8):: maxPower=0.0, minPower=0.0, avgPower=0.0, totalPower=0.0, annualPower=0.0
+
+      !Calculate the maximum, minimum, sum and average power produced by the turbines
+      maxPower = MAXVAL(WPOWER)
+      minPower = MINVAL(WPOWER)
+      totalPower = SUM(WPOWER)
+      avgPower = totalPower/N_TURB
+
+      !Write the power production to a file
+      OPEN(unit=20, file='Power_Summary.dat', status='unknown')
+110   format (A,F10.2,A)
+      WRITE(20, *) 'Number of turbines in the farm:', N_TURB
+      WRITE(20, 110) ' Minimum single turbine power production is:', minPower/1e6, ' MW'
+      WRITE(20, 110) ' Maximum single turbine power production is:', maxPower/1e6, ' MW'
+      WRITE(20, 110) ' Average turbine power production is:', avgPower/1e6, ' MW'
+      WRITE(20, 110) ' Total farm power production is:', totalPower/1e6, ' MW'
+      WRITE(20, *) 'Estimated annual power production for the farm:', INT(totalPower/1e6*24*365), ' MWh'
+      CLOSE(20)
+
+
       OPEN(unit=20, file='Power_Output.dat', status='unknown')
             WRITE(20, *)'Turbine Number(m)', 'Original Number', 'Turbine Location-X(m)', 'Turbine Location-Y(m)    ', 'POWER(W)'
       DO i=1,N_TURB
